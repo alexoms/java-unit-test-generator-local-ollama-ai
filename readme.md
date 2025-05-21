@@ -1,6 +1,4 @@
-Here’s a `README.md` you can use to describe your `generate_junit_tests.py` tool:
 
----
 
 ````markdown
 # 🧪 Java → JUnit Test Generator using Ollama
