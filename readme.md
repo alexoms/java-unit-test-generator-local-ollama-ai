@@ -1,6 +1,6 @@
 
 
-````markdown
+
 # 🧪 Java → JUnit Test Generator using Ollama
 
 This script reads `.java` source files from a given directory, breaks them down **method by method**, and uses a local **Ollama LLM** (like `codellama` or `qwen3`) to generate corresponding **JUnit 5 test cases** with a goal of at least **80% code coverage**.
@@ -26,7 +26,7 @@ Tests are streamed from the model and saved as individual `.md` files per method
 - A model like `codellama` or `qwen3` pulled:
   ```bash
   ollama pull codellama
-````
+  ```
 
 ---
 
