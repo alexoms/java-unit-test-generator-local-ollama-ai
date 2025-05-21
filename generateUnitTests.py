@@ -6,10 +6,9 @@ import json
 
 OLLAMA_HOST = "localhost"
 OLLAMA_PORT = 11434
-MODEL = "llama3.2:lateest"
+MODEL = "llama3.2:latest"
 OUTPUT_DIR = "tests_markdown"
 
-# Matches method definitions (very basic Java regex)
 METHOD_REGEX = re.compile(
     r'''^[ \t]*          # leading space
     (?:@\w+(?:\([^\)]*\))?\s*)*  # optional annotations like @Override
@@ -100,18 +99,23 @@ def send_to_ollama(prompt):
     conn.close()
     return output
 
-def write_markdown(output_text, class_filename, method_index):
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    base = os.path.splitext(os.path.basename(class_filename))[0]
-    out_file = os.path.join(OUTPUT_DIR, f"{base}_Method{method_index}_Test.md")
-    with open(out_file, "w", encoding="utf-8") as f:
-        f.write(f"# JUnit Test for Method {method_index} in `{class_filename}`\n\n")
+def write_markdown(output_text, full_file_path, java_root, method_index):
+    rel_path = os.path.relpath(full_file_path, java_root)
+    rel_dir = os.path.dirname(rel_path)
+    base_name = os.path.splitext(os.path.basename(full_file_path))[0]
+
+    output_subdir = os.path.join(OUTPUT_DIR, rel_dir)
+    os.makedirs(output_subdir, exist_ok=True)
+
+    out_file_path = os.path.join(output_subdir, f"{base_name}_Method{method_index}_Test.md")
+    with open(out_file_path, "w", encoding="utf-8") as f:
+        f.write(f"# JUnit Test for Method {method_index} in `{base_name}.java`\n\n")
         f.write("```\n")
         f.write(output_text)
         f.write("\n```\n")
-    print(f"\n✅ Saved test to: {out_file}")
+    print(f"\n✅ Saved test to: {out_file_path}")
 
-def process_file(filepath):
+def process_file(filepath, java_root):
     print(f"\n=== Processing: {filepath} ===")
     java_code = read_file(filepath)
     methods = extract_methods(java_code)
@@ -125,14 +129,14 @@ def process_file(filepath):
         print(f"\n--- Generating test for method {idx} ---")
         prompt = build_prompt(method_code, class_name, idx)
         output = send_to_ollama(prompt)
-        write_markdown(output, filepath, method_index=idx)
+        write_markdown(output, filepath, java_root, method_index=idx)
 
 def main():
     if len(sys.argv) != 2:
         print("Usage: python3 generate_junit_tests.py <path_to_java_source_folder>")
         sys.exit(1)
 
-    java_root = sys.argv[1]
+    java_root = os.path.abspath(sys.argv[1])
     if not os.path.isdir(java_root):
         print(f"Error: '{java_root}' is not a valid directory.")
         sys.exit(1)
@@ -143,7 +147,7 @@ def main():
         return
 
     for file in java_files:
-        process_file(file)
+        process_file(file, java_root)
 
 if __name__ == "__main__":
     main()
