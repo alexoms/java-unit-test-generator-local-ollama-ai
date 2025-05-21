@@ -102,6 +102,9 @@ Reminder: Write the JUnit 5 test code (with imports) for the method above.
 
 MIT License – Use freely, modify, contribute!
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+
 ---
 
 ## ✨ Author
