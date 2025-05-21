@@ -150,7 +150,7 @@ def process_file(filepath, java_root):
     trivial_ratio = trivial_count / total_methods
 
     # Large POJO: skip entirely
-    if trivial_ratio >= 0.8 and total_methods > 20:
+    if trivial_ratio >= 0.8 and total_methods > 60:
         print(f"⚠️ Skipping large POJO: {class_name} ({trivial_count}/{total_methods} trivial)")
         log_skipped_pojo(class_name, filepath, total_methods, trivial_count)
         return
