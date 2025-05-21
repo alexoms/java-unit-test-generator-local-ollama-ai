@@ -8,6 +8,7 @@ OLLAMA_HOST = "localhost"
 OLLAMA_PORT = 11434
 MODEL = "llama3.2:latest"
 OUTPUT_DIR = "tests_markdown"
+SKIPPED_LOG = os.path.join(OUTPUT_DIR, "_skipped_pojos.log")
 
 METHOD_REGEX = re.compile(
     r'''^[ \t]*          # leading space
@@ -62,6 +63,20 @@ def extract_methods(java_code):
         methods.append("\n".join(current))
     return methods
 
+def is_trivial_method(method_code):
+    lines = [line.strip() for line in method_code.strip().splitlines() if line.strip()]
+    if len(lines) < 2:
+        return False
+    first_line = lines[0].lower()
+    if any(k in first_line for k in ['get', 'set', 'is']):
+        if len(lines) <= 4:
+            body = " ".join(lines[1:])
+            return (
+                body.startswith("return ") or
+                ("=" in body and ("this." in body or body.endswith(";")))
+            )
+    return False
+
 def build_prompt(method_code, class_name, method_index):
     return (
         f"You are a Java testing expert.\n\n"
@@ -115,6 +130,11 @@ def write_markdown(output_text, full_file_path, java_root, method_index):
         f.write("\n```\n")
     print(f"\n✅ Saved test to: {out_file_path}")
 
+def log_skipped_pojo(class_name, file_path, method_count, trivial_count):
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    with open(SKIPPED_LOG, "a", encoding="utf-8") as f:
+        f.write(f"{class_name} - {file_path} (skipped {trivial_count}/{method_count} trivial methods)\n")
+
 def process_file(filepath, java_root):
     print(f"\n=== Processing: {filepath} ===")
     java_code = read_file(filepath)
@@ -125,7 +145,35 @@ def process_file(filepath, java_root):
         print("⚠️ No methods detected.")
         return
 
+    trivial_count = sum(1 for m in methods if is_trivial_method(m))
+    total_methods = len(methods)
+    trivial_ratio = trivial_count / total_methods
+
+    # Large POJO: skip entirely
+    if trivial_ratio >= 0.8 and total_methods > 20:
+        print(f"⚠️ Skipping large POJO: {class_name} ({trivial_count}/{total_methods} trivial)")
+        log_skipped_pojo(class_name, filepath, total_methods, trivial_count)
+        return
+
+    # Small POJO: generate one test for the full class
+    if trivial_ratio >= 0.8:
+        print(f"ℹ️ Detected small POJO: {class_name} ({trivial_count}/{total_methods} trivial)")
+        prompt = (
+            f"This is a simple Java POJO named `{class_name}`. "
+            f"Please generate a single JUnit 5 test class that instantiates it, sets values, "
+            f"and verifies behavior via getters and equals/hashCode if present.\n\n"
+            f"```java\n{java_code}\n```"
+        )
+        output = send_to_ollama(prompt)
+        write_markdown(output, filepath, java_root, method_index="All")
+        return
+
+    # Mixed-content class: generate one per non-trivial method
     for idx, method_code in enumerate(methods, start=1):
+        if is_trivial_method(method_code):
+            print(f"🔸 Skipping trivial method {idx} in {class_name}")
+            continue
+
         print(f"\n--- Generating test for method {idx} ---")
         prompt = build_prompt(method_code, class_name, idx)
         output = send_to_ollama(prompt)
@@ -140,6 +188,9 @@ def main():
     if not os.path.isdir(java_root):
         print(f"Error: '{java_root}' is not a valid directory.")
         sys.exit(1)
+
+    if os.path.exists(SKIPPED_LOG):
+        os.remove(SKIPPED_LOG)
 
     java_files = collect_java_files(java_root)
     if not java_files:
