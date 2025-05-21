@@ -10,7 +10,19 @@ MODEL = "llama3.2:lateest"
 OUTPUT_DIR = "tests_markdown"
 
 # Matches method definitions (very basic Java regex)
-METHOD_REGEX = re.compile(r'(public|protected|private|static|\s)+[\w<>\[\]]+\s+(\w+)\s*\([^)]*\)\s*{', re.MULTILINE)
+METHOD_REGEX = re.compile(
+    r'''^[ \t]*          # leading space
+    (?:@\w+(?:\([^\)]*\))?\s*)*  # optional annotations like @Override
+    (?:public|protected|private|static|final|native|synchronized|abstract|transient|strictfp|\s)+
+    [\w<>\[\],\s]+        # return type (e.g., List<String>)
+    \s+
+    (\w+)                # method name
+    \s*\([^)]*\)         # params (...)
+    \s*(?:throws\s+[^{]+)?  # optional throws clause
+    \s*(?=\{)            # must be followed by a {
+    ''',
+    re.MULTILINE | re.VERBOSE
+)
 
 def collect_java_files(root_dir):
     java_files = []
